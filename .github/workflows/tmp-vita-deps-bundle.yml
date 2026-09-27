@@ -1,0 +1,59 @@
+name: Temporary mkxp-z-vita public dependency bundle
+
+on:
+  pull_request:
+    branches: ['codex/tmp-vita-deps-ci-base']
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Create offline cache from public sources only
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p cache/mirrors cache/wheels cache/files
+
+          mirror() {
+            local url="$1" name="$2"
+            git clone --mirror "$url" "cache/mirrors/$name.git"
+          }
+
+          mirror https://github.com/madler/zlib.git zlib
+          mirror https://gitlab.com/bzip2/bzip2.git bzip2
+          mirror https://github.com/pnggroup/libpng.git libpng
+          mirror https://github.com/xiph/ogg.git ogg
+          mirror https://github.com/xiph/vorbis.git vorbis
+          mirror https://github.com/xiph/theora.git theora
+          mirror https://gitlab.freedesktop.org/pixman/pixman.git pixman
+          mirror https://gitlab.freedesktop.org/freetype/freetype.git freetype
+          mirror https://github.com/icculus/physfs.git physfs
+          mirror https://gitlab.freedesktop.org/uchardet/uchardet.git uchardet
+          mirror https://github.com/Rinnegatamante/vitaGL.git vitaGL
+          mirror https://github.com/Rinnegatamante/vitaShaRK.git vitaShaRK
+          mirror https://github.com/mkxp-z/mkxp-z.git mkxp-z
+
+          python3 -m pip download --disable-pip-version-check --no-deps meson==1.12.0 -d cache/wheels
+          wget -q https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz -O cache/files/libiconv-1.18.tar.gz
+
+          {
+            echo 'Public-source offline cache for mkxp-z-vita reproducibility test.'
+            echo 'Contains Git mirrors only for repositories fetched by scripts/bootstrap-vita.sh,'
+            echo 'Meson 1.12.0 wheel, upstream mkxp-z, and GNU libiconv 1.18 source tarball.'
+            echo 'No mkxp-z-vita private files are included.'
+            date -u +'%Y-%m-%dT%H:%M:%SZ'
+          } > cache/README.txt
+          du -sh cache
+
+      - name: Upload cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkxp-z-vita-public-source-cache
+          path: cache
+          compression-level: 6
+          retention-days: 1
+          if-no-files-found: error
